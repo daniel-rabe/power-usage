@@ -1,0 +1,11 @@
+{"id": 0, "Text": "Sensor", "Value": "Value", "ImageURL": "", "Children": [
+ {"id": 1, "Text": "PC", "ImageURL": "images_icon/computer.png", "Value": "", "Children": [
+  {"id": 2, "Text": "AMD Ryzen 7 5800X", "ImageURL": "images_icon/cpu.png", "Value": "", "Children": [
+   {"id": 3, "Text": "Powers", "ImageURL": "images_icon/power.png", "Value": "", "Children": [
+    {"id": 4, "Text": "Package", "Value": "55.0 W", "Children": []},
+    {"id": 5, "Text": "Core #1 (SMU)", "Value": "6.1 W", "Children": []}]}]},
+  {"id": 6, "Text": "AMD Radeon RX 6800", "ImageURL": "images_icon/ati.png", "Value": "", "Children": [
+   {"id": 7, "Text": "Powers", "ImageURL": "images_icon/power.png", "Value": "", "Children": [
+    {"id": 8, "Text": "GPU Core", "Value": "120.0 W", "Children": []},
+    {"id": 9, "Text": "GPU Package", "Value": "180.5 W", "Children": []}]}]}
+ ]}]}
