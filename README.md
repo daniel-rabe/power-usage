@@ -27,24 +27,26 @@ as another source.
 
 ## Setup on Windows
 
-1. Install Python 3.11+ and then, in this folder:
-   `pip install -e .` (add `.[nvidia]` if you have an NVIDIA card).
-2. Install [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/releases),
-   run it **as administrator**, and turn on *Options > Remote Web Server > Run*
-   (port 8085). Also tick *Options > Run On Windows Startup* and *Start Minimized*.
-3. Check what works: `python -m powerwidget probe`
-4. Print live watts: `python -m powerwidget now --watch`
-5. Start logging: `python -m powerwidget log`
-6. See history: `python -m powerwidget stats`
+**Quick start:** install [Python 3.11+](https://www.python.org/downloads/)
+(tick "Add python.exe to PATH"), then double-click **`start.bat`**. The first
+run sets everything up in a `.venv` folder next to it, then shows a menu:
+live watts, start logging, usage history, sensor check, and turning
+automatic logging at Windows logon on or off.
 
-To log in the background from logon, without a console window:
+For real CPU and GPU readings, also install
+[LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/releases),
+run it **as administrator**, and turn on *Options > Remote Web Server > Run*
+(port 8085). Also tick *Options > Run On Windows Startup* and *Start Minimized*.
+Without it the app still works, using NVIDIA's driver for the GPU (if you
+have one) and an estimate for the CPU.
 
-```
-schtasks /Create /TN "PowerWidget Logger" /SC ONLOGON /RL LIMITED ^
-  /TR "\"%LOCALAPPDATA%\Programs\Python\Python312\pythonw.exe\" -m powerwidget log"
-```
+Manual use, from a terminal in this folder:
 
-(Adjust the `pythonw.exe` path to your Python install.)
+1. `pip install -e .[nvidia]`
+2. Check what works: `python -m powerwidget probe`
+3. Print live watts: `python -m powerwidget now --watch`
+4. Start logging: `python -m powerwidget log`
+5. See history: `python -m powerwidget stats`
 
 No hardware? Add `--mock` to any command to use a fake sensor.
 
