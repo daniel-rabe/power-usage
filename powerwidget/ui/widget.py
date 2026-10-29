@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import QPoint, QSettings, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QDesktopServices, QMouseEvent
-from PySide6.QtWidgets import QLabel, QMenu, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QMenu, QMessageBox, QVBoxLayout, QWidget
 
 from ..config import Config
+from .. import winsetup
 from ..storage import Storage
 from . import fmt
 
@@ -28,6 +30,7 @@ class PowerWidget(QWidget):
     open_history = Signal()
     open_settings = Signal()
     quit_requested = Signal()
+    _setup_done = Signal(bool, str)
 
     def __init__(self, cfg: Config, storage: Storage, background):
         super().__init__(None, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
@@ -69,6 +72,7 @@ class PowerWidget(QWidget):
         self._today_timer.start()
         self._takeover_timer = QTimer(self, interval=30_000, timeout=self.background.try_start)
         self._takeover_timer.start()
+        self._setup_done.connect(self._show_setup_result)
         self.refresh()
         self.refresh_today()
 
@@ -140,10 +144,31 @@ class PowerWidget(QWidget):
         top.toggled.connect(self.set_on_top)
         menu.addAction(top)
         menu.addAction("Einstellungen…", self.open_settings.emit)
+        if winsetup.available():
+            auto = QAction("Mit Windows starten", menu, checkable=True, checked=winsetup.autostart_enabled())
+            auto.toggled.connect(self.toggle_autostart)
+            menu.addAction(auto)
+            from ..sensors.lhm_lib import pawnio_installed
+            if not pawnio_installed():
+                menu.addAction("CPU-Treiber (PawnIO) installieren…", self.install_driver)
         menu.addAction("Datenordner öffnen", self.open_data_folder)
         menu.addSeparator()
         menu.addAction("Beenden", self.quit_requested.emit)
         return menu
+
+    def toggle_autostart(self, on: bool) -> None:
+        ok, msg = winsetup.set_autostart(on)
+        if not ok:
+            self._show_setup_result(False, f"Automatischer Start konnte nicht geändert werden:\n{msg}")
+
+    def install_driver(self) -> None:
+        self._set_status("PawnIO wird installiert…")
+        threading.Thread(target=lambda: self._setup_done.emit(*winsetup.install_pawnio()), daemon=True).start()
+
+    def _show_setup_result(self, ok: bool, message: str) -> None:
+        self.refresh()
+        box = QMessageBox.information if ok else QMessageBox.warning
+        box(self, "Power Widget", message)
 
     def open_data_folder(self) -> None:
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(self.cfg.db_path).parent)))

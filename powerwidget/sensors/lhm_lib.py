@@ -68,6 +68,26 @@ def hardware_to_tree(hardware: Any, sensor_type_power: Any) -> dict[str, Any]:
     return {"Text": "Sensor", "Value": "", "Children": [node(hw) for hw in hardware]}
 
 
+def _load_clr(vendor_dir: Path):
+    import sys
+    import pythonnet
+    pythonnet.load("netfx")
+    import clr  # type: ignore[import-not-found]
+    sys.path.append(str(vendor_dir))
+    clr.AddReference(str(vendor_dir / "LibreHardwareMonitorLib.dll"))
+    return clr
+
+
+def self_test(vendor_dir: Path = VENDOR_DIR) -> str:
+    """Load the .NET library and create a Computer without opening it (no driver or admin needed).
+    Proves that pythonnet, the DLLs and their dependencies are all in place."""
+    _load_clr(vendor_dir)
+    from LibreHardwareMonitor.Hardware import Computer  # type: ignore[import-not-found]
+    computer = Computer()
+    computer.IsCpuEnabled = True
+    return f"LibreHardwareMonitorLib loaded ({type(computer).__module__}.{type(computer).__name__})"
+
+
 class LhmLibSource:
     name = "lhmlib"
 
@@ -82,15 +102,7 @@ class LhmLibSource:
         if not dll.exists():
             raise SourceUnavailable(f"{dll} is missing (run tools/fetch_lhm.py)")
         try:
-            import pythonnet
-            pythonnet.load("netfx")
-            import clr  # type: ignore[import-not-found]
-        except Exception as exc:
-            raise SourceUnavailable(f"pythonnet could not start the .NET Framework: {exc}") from exc
-        try:
-            import sys
-            sys.path.append(str(vendor_dir))
-            clr.AddReference(str(dll))
+            _load_clr(vendor_dir)
             from LibreHardwareMonitor.Hardware import Computer, SensorType  # type: ignore[import-not-found]
             self._power = SensorType.Power
             self._computer = Computer()

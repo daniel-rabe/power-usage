@@ -25,7 +25,27 @@ for the full comparison.
 For exact numbers a smart plug with an API (Shelly, Tasmota) can be added later
 as another source.
 
-## Setup on Windows
+## Download (no Python needed)
+
+Every push builds `PowerWidget.exe` with GitHub Actions. Get it from the
+latest [release](../../releases/latest) (made when a tag like `v0.1.0` is
+pushed) or, for any other build, from the *Artifacts* of a run under the
+Actions tab. Double-click it: Windows asks for administrator rights once, and
+the widget opens. Everything else is in the widget's right-click menu:
+
+- *Mit Windows starten*: autostart at logon, as administrator and without a prompt
+- *CPU-Treiber (PawnIO) installieren*: one-time driver install through winget (shown only while missing)
+- *Einstellungen*, *Verlauf und Diagramme*, *Datenordner öffnen*
+
+The exe is not code-signed, so Windows SmartScreen may say "Unknown publisher"
+(click *More info*, then *Run anyway*), and some virus scanners flag every
+PyInstaller program. The release lists a SHA-256 checksum, and the exe is built
+from this repository by the workflow in `.github/workflows/build.yml`, so you
+can verify what is inside. A log is kept in `%LOCALAPPDATA%\PowerWidget\powerwidget.log`.
+
+To cut a release: `git tag v0.1.0 && git push origin v0.1.0`.
+
+## Setup on Windows from source
 
 **Quick start:** install [Python 3.11+](https://www.python.org/downloads/)
 (tick "Add python.exe to PATH"), then double-click **`start.bat`**. The first
@@ -113,6 +133,9 @@ Downsampling and retention run every 10 minutes and on exit.
 pip install -e .[dev]
 pytest
 ```
+
+To build the exe yourself on Windows: `pip install -e .[nvidia] pyinstaller`,
+then `python packaging/build_exe.py` (result in `dist/`).
 
 Hardware access sits behind the `PowerSource` interface in
 `powerwidget/sensors/`, so the tests run on any OS with mock sources and

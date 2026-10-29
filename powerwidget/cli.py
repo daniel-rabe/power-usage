@@ -1,16 +1,18 @@
-"""Command line entry point: python -m powerwidget {now,probe,log,stats}."""
+"""Command line entry point: python -m powerwidget [widget|now|probe|log|stats|autostart|driver|selftest]."""
 
 from __future__ import annotations
 
 import argparse
 import logging
+import os
 import signal
 import sys
 import threading
 import time
 from datetime import datetime
+from pathlib import Path
 
-from .config import Config
+from .config import Config, default_db_path
 from .factory import build_composite
 from .sensors.base import PowerReading, SourceUnavailable
 
@@ -90,6 +92,48 @@ def cmd_stats(cfg: Config, args) -> int:
     return 0
 
 
+def cmd_autostart(cfg: Config, args) -> int:
+    from . import winsetup
+    if args.state == "status":
+        print("on" if winsetup.autostart_enabled() else "off")
+        return 0
+    ok, msg = winsetup.set_autostart(args.state == "on")
+    print(msg, file=sys.stdout if ok else sys.stderr)
+    return 0 if ok else 1
+
+
+def cmd_driver(cfg: Config, args) -> int:
+    from . import winsetup
+    ok, msg = winsetup.install_pawnio()
+    print(msg, file=sys.stdout if ok else sys.stderr)
+    return 0 if ok else 1
+
+
+def cmd_selftest(cfg: Config, args) -> int:
+    """Check that everything the packaged app needs can be loaded. Used by CI on the built exe."""
+    import importlib
+    lines, ok = [], True
+    for mod in ("PySide6.QtWidgets", "pyqtgraph", "psutil", "powerwidget.ui.app", "powerwidget.ui.history"):
+        try:
+            importlib.import_module(mod)
+            lines.append(f"ok    import {mod}")
+        except Exception as exc:
+            ok = False
+            lines.append(f"FAIL  import {mod}: {exc!r}")
+    if os.name == "nt":
+        from .sensors.lhm_lib import self_test
+        try:
+            lines.append("ok    " + self_test())
+        except Exception as exc:
+            ok = False
+            lines.append(f"FAIL  LibreHardwareMonitorLib: {exc!r}")
+    text = "\n".join(lines) + "\n"
+    if args.output:
+        Path(args.output).write_text(text, encoding="utf-8")
+    print(text, end="")
+    return 0 if ok else 1
+
+
 def cmd_widget(cfg: Config, args) -> int:
     from .ui.app import run
     return run(cfg)
@@ -100,23 +144,36 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--mock", action="store_true", help="use a fake sensor (no hardware needed)")
     p.add_argument("--db", help="database path (overrides config)")
     p.add_argument("-v", "--verbose", action="store_true")
-    sub = p.add_subparsers(dest="cmd", required=True)
+    sub = p.add_subparsers(dest="cmd")  # no command: open the widget
     now = sub.add_parser("now", help="print current watts")
     now.add_argument("-w", "--watch", action="store_true", help="keep printing every interval")
     sub.add_parser("probe", help="check which power sources work on this PC")
     sub.add_parser("log", help="run the background logger")
     sub.add_parser("stats", help="show energy used over recent periods")
-    sub.add_parser("widget", help="open the floating widget (logs too, unless a logger already runs)")
+    sub.add_parser("widget", help="open the floating widget (default; logs too, unless a logger already runs)")
+    auto = sub.add_parser("autostart", help="start the widget at Windows logon (run as administrator)")
+    auto.add_argument("state", choices=["on", "off", "status"])
+    sub.add_parser("driver", help="install the PawnIO driver (Windows, run as administrator)")
+    st = sub.add_parser("selftest", help="check that the app's components load")
+    st.add_argument("--output", help="also write the result to this file")
     args = p.parse_args(argv)
 
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
-                        format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    level = logging.DEBUG if args.verbose else logging.INFO
+    log_format = "%(asctime)s %(levelname)s %(name)s: %(message)s"
+    if sys.stderr is None:  # windowed exe: there is no console, so keep a log file
+        log_file = Path(default_db_path()).with_name("powerwidget.log")
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        logging.basicConfig(level=level, format=log_format, filename=log_file, encoding="utf-8")
+    else:
+        logging.basicConfig(level=level, format=log_format)
     cfg = Config.load()
+    args.cmd = args.cmd or "widget"
     if args.mock:
         cfg.sources = ["mock"]
     if args.db:
         cfg.db_path = args.db
-    handler = {"now": cmd_now, "probe": cmd_probe, "log": cmd_log, "stats": cmd_stats, "widget": cmd_widget}[args.cmd]
+    handler = {"now": cmd_now, "probe": cmd_probe, "log": cmd_log, "stats": cmd_stats, "widget": cmd_widget,
+               "autostart": cmd_autostart, "driver": cmd_driver, "selftest": cmd_selftest}[args.cmd]
     try:
         return handler(cfg, args)
     except SourceUnavailable as exc:
