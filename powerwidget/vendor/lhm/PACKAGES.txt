@@ -1,0 +1,16 @@
+Downloaded by tools/fetch_lhm.py from nuget.org. LibreHardwareMonitorLib is MPL-2.0.
+
+LibreHardwareMonitorLib 0.9.6: MPL-2.0
+DiskInfoToolkit 1.1.2: MPL-2.0
+HidSharp 2.6.4: LICENSE.txt
+RAMSPDToolkit-NDD 1.4.2: MPL-2.0
+System.Management 10.0.2: MIT
+System.Memory 4.6.3: MIT
+System.Threading.AccessControl 10.0.3: MIT
+BlackSharp.Core 1.0.7: MPL-2.0
+System.CodeDom 10.0.2: MIT
+System.Buffers 4.6.1: MIT
+System.Numerics.Vectors 4.6.1: MIT
+System.Runtime.CompilerServices.Unsafe 6.1.2: MIT
+System.Security.AccessControl 6.0.0: MIT
+System.Security.Principal.Windows 5.0.0: MIT
