@@ -30,14 +30,13 @@ def test_energy_from_raw(db):
     s = db.summary(T0, T0 + 3600)
     assert s.energy_wh == pytest.approx(200)
     assert s.avg_w == pytest.approx(200)
-    assert s.resolution == "raw"
 
 
 def test_rollup_preserves_energy_and_extremes(db):
     fill(db, T0, 1800, 100)
     fill(db, T0 + 1800, 1800, 300)
     db.maintain(now=T0 + 7200)
-    minutes = db.series(T0, T0 + 3600, "minute")
+    minutes = db.conn.execute("SELECT bucket, avg_w FROM minute WHERE bucket < ? ORDER BY bucket", (T0 + 3600,)).fetchall()
     assert len(minutes) == 60 and minutes[0][1] == pytest.approx(100) and minutes[-1][1] == pytest.approx(300)
     hour = db.conn.execute("SELECT avg_w, min_w, max_w, energy_wh, samples FROM hour").fetchall()
     assert hour == [(pytest.approx(200), 100, 300, pytest.approx(200), 720)]
@@ -46,10 +45,10 @@ def test_rollup_preserves_energy_and_extremes(db):
 def test_incomplete_bucket_is_not_rolled_up_early(db):
     fill(db, T0, 30, 100)
     db.maintain(now=T0 + 30)
-    assert db.series(T0, T0 + 60, "minute") == []
+    assert db.conn.execute("SELECT COUNT(*) FROM minute").fetchone()[0] == 0
     fill(db, T0 + 30, 30, 100)
     db.maintain(now=T0 + 61)
-    assert db.series(T0, T0 + 60, "minute") == [(T0, pytest.approx(100))]
+    assert db.conn.execute("SELECT bucket, avg_w FROM minute").fetchall() == [(T0, pytest.approx(100))]
 
 
 def test_retention_keeps_totals_via_coarser_tables(db):
@@ -59,7 +58,6 @@ def test_retention_keeps_totals_via_coarser_tables(db):
     assert db.conn.execute("SELECT COUNT(*) FROM raw").fetchone()[0] == 0
     assert db.conn.execute("SELECT COUNT(*) FROM minute").fetchone()[0] == 0
     s = db.summary(T0, T0 + DAY)
-    assert s.resolution == "hour"
     assert s.energy_wh == pytest.approx(120)
 
 
@@ -103,3 +101,37 @@ def test_run_loop_with_mock(tmp_path):
     PowerLogger(CompositeSource([MockSource()]), storage, interval_s=0.01).run(max_samples=5)
     assert storage.conn.execute("SELECT COUNT(*) FROM raw").fetchone()[0] == 5
     storage.close()
+
+
+def test_series_mixes_resolutions_without_double_counting(db):
+    # 3 days of 100 W; after retention, day 1 lives only in hour rows, day 2 in
+    # minute rows, day 3 still in raw.
+    for day in range(3):
+        fill(db, T0 + day * DAY, DAY, 100, step=60)
+        db.maintain(now=T0 + (day + 1) * DAY)
+    db.raw_retention_s, db.minute_retention_s = DAY, 2 * DAY
+    db.maintain(now=T0 + 3 * DAY)
+    assert db.conn.execute("SELECT MIN(ts) FROM raw").fetchone()[0] == T0 + 2 * DAY
+    assert db.conn.execute("SELECT MIN(bucket) FROM minute").fetchone()[0] == T0 + DAY
+    s = db.summary(T0, T0 + 3 * DAY)
+    assert s.energy_wh == pytest.approx(3 * 24 * 100)
+    points = db.series(T0, T0 + 3 * DAY, 3600)
+    assert len(points) == 72
+    assert all(p.avg_w == pytest.approx(100) and p.energy_wh == pytest.approx(100) for p in points)
+    assert points[0].cpu_w == pytest.approx(50)
+
+
+def test_series_includes_newest_samples_before_rollup(db):
+    fill(db, T0, 90, 200)
+    pts = db.series(T0, T0 + 120, 60)
+    assert [p.ts for p in pts] == [T0, T0 + 60]
+    assert pts[0].max_w == 200
+
+
+def test_latest_and_energy_by_day(db):
+    assert db.latest() is None
+    fill(db, T0, 7200, 50, step=60)
+    r = db.latest()
+    assert r.total_w == 50 and r.sources == {"cpu": "mock"}
+    days = db.energy_by_day(T0, T0 + 7200)
+    assert sum(wh for _, wh in days) == pytest.approx(100)

@@ -7,7 +7,7 @@ name = "powerwidget"
 version = "0.1.0"
 description = "Track and log the power usage of a Windows desktop PC"
 requires-python = ">=3.11"
-dependencies = ["psutil>=5.9"]
+dependencies = ["psutil>=5.9", "PySide6-Essentials>=6.6", "pyqtgraph>=0.13.7"]
 
 [project.optional-dependencies]
 nvidia = ["nvidia-ml-py>=12"]

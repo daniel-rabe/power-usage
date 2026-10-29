@@ -14,6 +14,7 @@ from __future__ import annotations
 import sqlite3
 import time
 from dataclasses import dataclass
+from datetime import date, datetime
 from pathlib import Path
 
 from .sensors.base import PowerReading
@@ -57,16 +58,39 @@ class Summary:
     max_w: float | None
     covered_s: float
     estimated_fraction: float
-    resolution: str
+
+
+@dataclass(frozen=True)
+class Point:
+    """One chart bucket."""
+
+    ts: float
+    avg_w: float
+    min_w: float
+    max_w: float
+    cpu_w: float | None
+    gpu_w: float | None
+    energy_wh: float
+    covered_s: float
 
 
 class Storage:
     def __init__(self, path: str | Path, raw_retention_days: int = 7, minute_retention_days: int = 90):
         if str(path) != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(str(path), check_same_thread=False)
-        self.conn.execute("PRAGMA journal_mode=WAL")
-        self.conn.executescript(SCHEMA + "".join(AGG_SCHEMA.format(t=t) for t in RESOLUTIONS))
+        self.conn = sqlite3.connect(str(path), timeout=10, check_same_thread=False)
+        # The widget and the logger may open a brand-new file at the same moment;
+        # switching to WAL ignores the busy timeout, so retry briefly.
+        for attempt in range(50):
+            try:
+                if self.conn.execute("PRAGMA journal_mode").fetchone()[0].lower() != "wal":
+                    self.conn.execute("PRAGMA journal_mode=WAL")
+                self.conn.executescript(SCHEMA + "".join(AGG_SCHEMA.format(t=t) for t in RESOLUTIONS))
+                break
+            except sqlite3.OperationalError:
+                if attempt == 49:
+                    raise
+                time.sleep(0.1)
         self.raw_retention_s = raw_retention_days * 86400
         self.minute_retention_s = minute_retention_days * 86400
 
@@ -133,37 +157,74 @@ class Storage:
 
     # --- queries ------------------------------------------------------------
 
+    def _unified(self, start: float, end: float) -> tuple[str, dict]:
+        """A subquery over all three tables that uses the finest data available
+        for each stretch of time: raw where it still exists, minute rows before
+        that, hour rows before those. Retention cuts on minute/hour boundaries,
+        so the stretches neither overlap nor leave holes."""
+        oldest_raw = self._oldest("raw", "ts")
+        oldest_min = self._oldest("minute", "bucket")
+        raw_from = (oldest_raw // 60) * 60 if oldest_raw is not None else float("inf")
+        min_from = (oldest_min // 3600) * 3600 if oldest_min is not None else raw_from
+        sql = """
+            SELECT ts AS t, dt_s AS cov, total_w AS w, total_w AS wmin, total_w AS wmax,
+                   cpu_w AS cpu, gpu_w AS gpu, 1 AS n, estimated AS est
+            FROM raw WHERE ts >= :start AND ts < :end
+            UNION ALL
+            SELECT bucket, covered_s, avg_w, min_w, max_w, avg_cpu_w, avg_gpu_w, samples, estimated_samples
+            FROM minute WHERE bucket >= :start AND bucket < :end AND bucket >= :min_from AND bucket < :raw_from
+            UNION ALL
+            SELECT bucket, covered_s, avg_w, min_w, max_w, avg_cpu_w, avg_gpu_w, samples, estimated_samples
+            FROM hour WHERE bucket >= :start AND bucket < :end AND bucket < :min_from
+        """
+        return sql, {"start": start, "end": end, "raw_from": raw_from, "min_from": min_from}
+
     def _oldest(self, table: str, col: str) -> float | None:
         return self.conn.execute(f"SELECT MIN({col}) FROM {table}").fetchone()[0]
 
     def summary(self, start: float, end: float) -> Summary:
-        """Energy and power stats for [start, end), from the finest table that
-        still holds data back to `start`."""
-        oldest_raw = self._oldest("raw", "ts")
-        oldest_min = self._oldest("minute", "bucket")
-        if oldest_raw is not None and oldest_raw <= start + 60:
-            res = "raw"
-            row = self.conn.execute(
-                """SELECT COALESCE(SUM(total_w*dt_s)/3600.0, 0), SUM(total_w*dt_s)/NULLIF(SUM(dt_s), 0),
-                          MIN(total_w), MAX(total_w), COALESCE(SUM(dt_s), 0), COUNT(*), COALESCE(SUM(estimated), 0)
-                   FROM raw WHERE ts >= ? AND ts < ?""", (start, end)).fetchone()
-        else:
-            res = "minute" if oldest_min is not None and oldest_min <= start + 3600 else "hour"
-            row = self.conn.execute(
-                f"""SELECT COALESCE(SUM(energy_wh), 0), SUM(energy_wh)*3600.0/NULLIF(SUM(covered_s), 0),
-                           MIN(min_w), MAX(max_w), COALESCE(SUM(covered_s), 0), COALESCE(SUM(samples), 0),
-                           COALESCE(SUM(estimated_samples), 0)
-                    FROM {res} WHERE bucket >= ? AND bucket < ?""", (start, end)).fetchone()
-        energy, avg, mn, mx, covered, n, est = row
+        """Energy and power stats for [start, end)."""
+        sub, params = self._unified(start, end)
+        energy, avg, mn, mx, covered, n, est = self.conn.execute(
+            f"""SELECT COALESCE(SUM(w*cov)/3600.0, 0), SUM(w*cov)/NULLIF(SUM(cov), 0), MIN(wmin), MAX(wmax),
+                       COALESCE(SUM(cov), 0), COALESCE(SUM(n), 0), COALESCE(SUM(est), 0)
+                FROM ({sub})""", params).fetchone()
         return Summary(energy_wh=energy, avg_w=avg, min_w=mn, max_w=mx, covered_s=covered,
-                       estimated_fraction=(est / n) if n else 0.0, resolution=res)
+                       estimated_fraction=(est / n) if n else 0.0)
 
-    def series(self, start: float, end: float, resolution: str = "minute") -> list[tuple[float, float]]:
-        """(timestamp, avg watts) points for charts."""
-        if resolution == "raw":
-            sql = "SELECT ts, total_w FROM raw WHERE ts >= ? AND ts < ? ORDER BY ts"
-        elif resolution in RESOLUTIONS:
-            sql = f"SELECT bucket, avg_w FROM {resolution} WHERE bucket >= ? AND bucket < ? ORDER BY bucket"
-        else:
-            raise ValueError(f"unknown resolution {resolution!r}")
-        return [tuple(r) for r in self.conn.execute(sql, (start, end))]
+    def series(self, start: float, end: float, bin_s: int = 60) -> list[Point]:
+        """Chart points for [start, end), averaged into `bin_s` buckets."""
+        sub, params = self._unified(start, end)
+        params["bin"] = int(bin_s)
+        rows = self.conn.execute(
+            f"""SELECT CAST(t / :bin AS INTEGER) * :bin AS b,
+                       SUM(w*cov)/SUM(cov), MIN(wmin), MAX(wmax),
+                       SUM(cpu*cov)/NULLIF(SUM(CASE WHEN cpu IS NOT NULL THEN cov END), 0),
+                       SUM(gpu*cov)/NULLIF(SUM(CASE WHEN gpu IS NOT NULL THEN cov END), 0),
+                       SUM(w*cov)/3600.0, SUM(cov)
+                FROM ({sub}) GROUP BY b HAVING SUM(cov) > 0 ORDER BY b""", params)
+        return [Point(*r) for r in rows]
+
+    def energy_by_day(self, start: float, end: float) -> list[tuple[date, float]]:
+        """(local date, Wh) for each day in [start, end) that has data."""
+        days: dict[date, float] = {}
+        for p in self.series(start, end, 3600):
+            d = datetime.fromtimestamp(p.ts).date()
+            days[d] = days.get(d, 0.0) + p.energy_wh
+        return sorted(days.items())
+
+    def latest(self) -> PowerReading | None:
+        row = self.conn.execute(
+            "SELECT ts, total_w, cpu_w, gpu_w, other_w, estimated, source FROM raw ORDER BY ts DESC LIMIT 1"
+        ).fetchone()
+        if row is None:
+            return None
+        ts, total, cpu, gpu, other, est, source = row
+        sources = dict(part.split("=", 1) for part in source.split(",") if "=" in part)
+        return PowerReading(ts, total, cpu, gpu, other, bool(est), sources)
+
+    def recent(self, start: float, end: float, limit: int = 2000) -> list[tuple]:
+        """Raw samples, newest first: (ts, total, cpu, gpu, other, estimated, source)."""
+        return self.conn.execute(
+            """SELECT ts, total_w, cpu_w, gpu_w, other_w, estimated, source FROM raw
+               WHERE ts >= ? AND ts < ? ORDER BY ts DESC LIMIT ?""", (start, end, limit)).fetchall()

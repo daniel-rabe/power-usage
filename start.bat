@@ -7,68 +7,76 @@ title Power Widget
 set "VENV=%~dp0.venv"
 set "PY=%VENV%\Scripts\python.exe"
 set "PYW=%VENV%\Scripts\pythonw.exe"
-set "TASK=PowerWidget Logger"
+set "TASK=PowerWidget"
+set "OLDTASK=PowerWidget Logger"
 
-if exist "%PY%" goto menu
+if exist "%PY%" goto checkdeps
 
-echo First start: setting up Power Widget. This takes a minute.
+echo Erster Start: Power Widget wird eingerichtet. Das dauert ein bis zwei Minuten.
 echo.
 set "BASEPY="
 where py >nul 2>nul && set "BASEPY=py -3"
 if not defined BASEPY where python >nul 2>nul && set "BASEPY=python"
 if not defined BASEPY (
-    echo Python was not found. Install Python 3.11 or newer from https://www.python.org/downloads/
-    echo and tick "Add python.exe to PATH" during setup. Then run this file again.
+    echo Python wurde nicht gefunden. Bitte Python 3.11 oder neuer von https://www.python.org/downloads/
+    echo installieren und dabei "Add python.exe to PATH" ankreuzen. Danach diese Datei erneut starten.
     pause
     exit /b 1
 )
 %BASEPY% -c "import sys; sys.exit(sys.version_info < (3, 11))"
 if errorlevel 1 (
-    echo Python 3.11 or newer is needed. Please update Python and run this file again.
+    echo Python 3.11 oder neuer wird benoetigt. Bitte Python aktualisieren und diese Datei erneut starten.
     pause
     exit /b 1
 )
 %BASEPY% -m venv "%VENV%" || goto setupfail
+
+:checkdeps
+rem (Re)install when pyproject.toml changed, e.g. after an update added dependencies.
+fc /b pyproject.toml "%VENV%\installed-pyproject.toml" >nul 2>nul && goto menu
+echo Pakete werden installiert...
 "%PY%" -m pip install --quiet --upgrade pip
 "%PY%" -m pip install --quiet -e ".[nvidia]" || goto setupfail
-echo Setup done.
+copy /y pyproject.toml "%VENV%\installed-pyproject.toml" >nul
+echo Fertig.
 echo.
 
 :menu
 echo ==============================================
 echo   Power Widget
 echo ==============================================
-echo   1  Show live power usage
-echo   2  Start logging in the background
-echo   3  Show usage history (kWh)
-echo   4  Check which sensors work on this PC
-echo   5  Start logging automatically at Windows logon
-echo   6  Stop automatic logging at logon
-echo   0  Exit
+echo   1  Widget oeffnen (zeichnet auch auf)
+echo   2  Aktuelle Leistung hier anzeigen
+echo   3  Verbrauch der letzten Tage (kWh)
+echo   4  Pruefen, welche Sensoren funktionieren
+echo   5  Widget bei Windows-Anmeldung automatisch starten
+echo   6  Automatischen Start wieder entfernen
+echo   0  Beenden
 echo.
-echo   Tip: start LibreHardwareMonitor as administrator with its
-echo   Remote Web Server turned on for real CPU and GPU readings.
+echo   Tipp: LibreHardwareMonitor als Administrator starten und den
+echo   Remote Web Server einschalten, dann gibt es echte CPU- und GPU-Werte.
 echo.
-choice /c 1234560 /n /m "Choose 1-6 or 0: "
+choice /c 1234560 /n /m "Auswahl 1-6 oder 0: "
 set "SEL=%errorlevel%"
 echo.
-if "%SEL%"=="1" goto live
-if "%SEL%"=="2" goto log
+if "%SEL%"=="1" goto widget
+if "%SEL%"=="2" goto live
 if "%SEL%"=="3" goto stats
 if "%SEL%"=="4" goto probe
 if "%SEL%"=="5" goto autostart
 if "%SEL%"=="6" goto noautostart
 exit /b 0
 
-:live
-echo Press Ctrl+C to stop, then N to return to the menu.
-"%PY%" -m powerwidget now --watch
+:widget
+start "" "%PYW%" -m powerwidget widget
+echo Das Widget wurde gestartet. Doppelklick darauf zeigt Verlauf und Diagramme,
+echo Rechtsklick oeffnet das Menue.
+echo.
 goto menu
 
-:log
-start "Power Widget Logger" /min "%PY%" -m powerwidget log
-echo Logger started in a minimized window. Close that window to stop logging.
-echo.
+:live
+echo Mit Strg+C beenden, danach N fuer zurueck zum Menue.
+"%PY%" -m powerwidget now --watch
 goto menu
 
 :stats
@@ -84,25 +92,25 @@ pause
 goto menu
 
 :autostart
-schtasks /Create /F /TN "%TASK%" /SC ONLOGON /RL LIMITED /TR "\"%PYW%\" -m powerwidget log" >nul
+schtasks /Delete /F /TN "%OLDTASK%" >nul 2>nul
+schtasks /Create /F /TN "%TASK%" /SC ONLOGON /RL LIMITED /TR "\"%PYW%\" -m powerwidget widget" >nul
 if errorlevel 1 (
-    echo Could not create the logon task.
+    echo Der automatische Start konnte nicht eingerichtet werden.
 ) else (
-    echo The logger will now start hidden every time you log on to Windows.
-    schtasks /Run /TN "%TASK%" >nul && echo It is running now as well.
+    echo Das Widget startet jetzt bei jeder Anmeldung an Windows automatisch.
 )
 echo.
 goto menu
 
 :noautostart
-schtasks /End /TN "%TASK%" >nul 2>nul
-schtasks /Delete /F /TN "%TASK%" >nul 2>nul && echo Automatic logging removed. || echo Automatic logging was not set up.
+schtasks /Delete /F /TN "%OLDTASK%" >nul 2>nul
+schtasks /Delete /F /TN "%TASK%" >nul 2>nul && echo Automatischer Start entfernt. || echo Automatischer Start war nicht eingerichtet.
 echo.
 goto menu
 
 :setupfail
 echo.
-echo Setup failed. Check your internet connection and run this file again.
+echo Einrichtung fehlgeschlagen. Bitte Internetverbindung pruefen und diese Datei erneut starten.
 rmdir /s /q "%VENV%" 2>nul
 pause
 exit /b 1

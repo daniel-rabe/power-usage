@@ -50,8 +50,13 @@ def cmd_probe(cfg: Config, args) -> int:
 
 
 def cmd_log(cfg: Config, args) -> int:
+    from .lock import logger_lock
     from .logger import PowerLogger
     from .storage import Storage
+    lock = logger_lock(cfg.db_path)
+    if not lock.acquire():
+        print("The logger is already running (or the widget is logging).", file=sys.stderr)
+        return 1
     storage = Storage(cfg.db_path, cfg.raw_retention_days, cfg.minute_retention_days)
     src = build_composite(cfg)
     stop = threading.Event()
@@ -63,6 +68,7 @@ def cmd_log(cfg: Config, args) -> int:
     finally:
         src.close()
         storage.close()
+        lock.release()
     return 0
 
 
@@ -84,6 +90,11 @@ def cmd_stats(cfg: Config, args) -> int:
     return 0
 
 
+def cmd_widget(cfg: Config, args) -> int:
+    from .ui.app import run
+    return run(cfg)
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="powerwidget", description="Track desktop PC power usage.")
     p.add_argument("--mock", action="store_true", help="use a fake sensor (no hardware needed)")
@@ -95,6 +106,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("probe", help="check which power sources work on this PC")
     sub.add_parser("log", help="run the background logger")
     sub.add_parser("stats", help="show energy used over recent periods")
+    sub.add_parser("widget", help="open the floating widget (logs too, unless a logger already runs)")
     args = p.parse_args(argv)
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
@@ -104,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
         cfg.sources = ["mock"]
     if args.db:
         cfg.db_path = args.db
-    handler = {"now": cmd_now, "probe": cmd_probe, "log": cmd_log, "stats": cmd_stats}[args.cmd]
+    handler = {"now": cmd_now, "probe": cmd_probe, "log": cmd_log, "stats": cmd_stats, "widget": cmd_widget}[args.cmd]
     try:
         return handler(cfg, args)
     except SourceUnavailable as exc:

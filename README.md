@@ -1,12 +1,12 @@
 # Power widget
 
 Tracks the power draw of a Windows **desktop** PC and logs it to SQLite so you
-can look back at past usage. This is milestones 1 and 2: the sensor layer and
-the background logger. The floating widget, charts, kWh/cost view and the
-installer come next.
+can look back at past usage. It has a sensor layer, a background logger, and a
+floating widget with a history window (charts, kWh and cost, raw samples,
+CSV export). Packaging as a single .exe comes next.
 
-Stack: Python 3.11+, standard library plus `psutil`. The UI will use PySide6
-and the app will be packaged with PyInstaller.
+Stack: Python 3.11+, `psutil`, PySide6 and pyqtgraph for the UI. Packaging
+with PyInstaller is planned.
 
 ## Where the watts come from
 
@@ -29,9 +29,26 @@ as another source.
 
 **Quick start:** install [Python 3.11+](https://www.python.org/downloads/)
 (tick "Add python.exe to PATH"), then double-click **`start.bat`**. The first
-run sets everything up in a `.venv` folder next to it, then shows a menu:
-live watts, start logging, usage history, sensor check, and turning
-automatic logging at Windows logon on or off.
+run sets everything up in a `.venv` folder next to it, then shows a menu
+(in German): open the widget, live watts in the console, usage history,
+sensor check, and starting the widget automatically at Windows logon.
+
+## The widget
+
+A small always-on-top box with the current total watts, the CPU/GPU/rest
+split and today's kWh and cost. Drag it anywhere; it remembers its place.
+
+- **Double-click** (or tray icon > *Verlauf*) opens the history window:
+  - range buttons: 1 hour, 24 hours, 7 days, 30 days, 1 year
+  - totals: kWh, cost, average and peak watts, recorded time, share of estimated samples
+  - tab *Leistung*: total, CPU and GPU watts over time (hover for values)
+  - tab *Verbrauch*: energy bars per 5 minutes, hour or day
+  - tab *Messwerte*: the individual 5-second samples
+  - *CSV exportieren*: the chart data as a CSV that opens in German Excel
+- **Right-click**: history, always-on-top on/off, open data folder, quit.
+
+The widget logs by itself. If a separate `powerwidget log` process already
+runs, the widget only reads, so no sample is ever counted twice.
 
 For real CPU and GPU readings, also install
 [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/releases),
@@ -47,6 +64,7 @@ Manual use, from a terminal in this folder:
 3. Print live watts: `python -m powerwidget now --watch`
 4. Start logging: `python -m powerwidget log`
 5. See history: `python -m powerwidget stats`
+6. Open the widget: `pythonw -m powerwidget widget`
 
 No hardware? Add `--mock` to any command to use a fake sensor.
 
@@ -62,6 +80,8 @@ other_w = 40          # board, RAM, drives, fans, PSU loss
 cpu_tdp_w = 105       # only used by the estimate fallback
 raw_retention_days = 7
 minute_retention_days = 90
+price_per_kwh = 0.30  # for the cost display
+currency = "€"
 ```
 
 ## Storage

@@ -42,6 +42,9 @@ class Config:
     raw_retention_days: int = 7
     minute_retention_days: int = 90  # hourly rows are kept forever
     maintenance_interval_s: float = 600.0
+    # Electricity price for the cost display.
+    price_per_kwh: float = 0.30
+    currency: str = "€"
 
     @classmethod
     def load(cls, path: Path | None = None) -> "Config":
