@@ -1,0 +1,19 @@
+{"id": 0, "Text": "Sensor", "Min": "Min", "Value": "Value", "Max": "Max", "ImageURL": "", "Children": [
+ {"id": 1, "Text": "DESKTOP-TEST", "ImageURL": "images_icon/computer.png", "Value": "", "Children": [
+  {"id": 2, "Text": "ASUS PRIME Z790-P", "ImageURL": "images_icon/mainboard.png", "Value": "", "HardwareId": "/motherboard", "Children": [
+   {"id": 3, "Text": "Voltages", "ImageURL": "images_icon/voltage.png", "Value": "", "Children": [
+    {"id": 4, "Text": "Vcore", "Value": "1,152 V", "SensorId": "/lpc/nct6798d/0/voltage/0", "Type": "Voltage", "Children": []}]}]},
+  {"id": 10, "Text": "Intel Core i7-13700K", "ImageURL": "images_icon/cpu.png", "Value": "", "HardwareId": "/intelcpu/0", "Children": [
+   {"id": 11, "Text": "Powers", "ImageURL": "images_icon/power.png", "Value": "", "Children": [
+    {"id": 12, "Text": "CPU Package", "Value": "87,4 W", "SensorId": "/intelcpu/0/power/0", "Type": "Power", "Children": []},
+    {"id": 13, "Text": "CPU Cores", "Value": "79.1 W", "SensorId": "/intelcpu/0/power/1", "Type": "Power", "Children": []},
+    {"id": 14, "Text": "CPU Memory", "Value": "2.0 W", "SensorId": "/intelcpu/0/power/3", "Type": "Power", "Children": []}]},
+   {"id": 15, "Text": "Temperatures", "ImageURL": "images_icon/temperature.png", "Value": "", "Children": [
+    {"id": 16, "Text": "CPU Package", "Value": "64.0 °C", "SensorId": "/intelcpu/0/temperature/0", "Type": "Temperature", "Children": []}]}]},
+  {"id": 20, "Text": "Intel UHD Graphics 770", "ImageURL": "images_icon/intel.png", "Value": "", "HardwareId": "/gpu-intel-integrated/0", "Children": [
+   {"id": 21, "Text": "Powers", "Value": "", "Children": [
+    {"id": 22, "Text": "GPU Power", "Value": "1.3 W", "SensorId": "/gpu-intel-integrated/0/power/0", "Type": "Power", "Children": []}]}]},
+  {"id": 30, "Text": "NVIDIA GeForce RTX 4070", "ImageURL": "images_icon/nvidia.png", "Value": "", "HardwareId": "/gpu-nvidia/0", "Children": [
+   {"id": 31, "Text": "Powers", "ImageURL": "images_icon/power.png", "Value": "", "Children": [
+    {"id": 32, "Text": "GPU Package", "Value": "142.6 W", "SensorId": "/gpu-nvidia/0/power/0", "Type": "Power", "Children": []}]}]}
+ ]}]}
