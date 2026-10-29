@@ -53,8 +53,9 @@ def test_subhardware_is_walked():
     assert parse_lhm(hardware_to_tree([cpu], POWER)).cpu_w == pytest.approx(55.0)
 
 
-def test_source_unavailable_off_windows_with_reason():
-    with pytest.raises(SourceUnavailable, match="Windows"):
+def test_source_unavailable_without_admin_or_driver_gives_a_reason():
+    # Linux: not Windows. Windows CI runner: administrator, but no PawnIO driver.
+    with pytest.raises(SourceUnavailable, match="Windows|administrator|PawnIO"):
         LhmLibSource()
 
 
