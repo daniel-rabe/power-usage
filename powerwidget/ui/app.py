@@ -10,6 +10,7 @@ from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap, QPolygonF
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from ..config import Config
+from ..lock import InstanceLock
 from ..storage import Storage
 from .background import BackgroundLogger
 
@@ -38,6 +39,10 @@ def run(cfg: Config) -> int:
         locale.setlocale(locale.LC_TIME, "")  # month and weekday names on chart axes in the user's language
     except locale.Error:
         pass
+    # One widget at a time: a second start (e.g. autostart plus a double-click) just exits.
+    single = InstanceLock(cfg.db_path + ".widget.lock")
+    if not single.acquire():
+        return 0
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName("Power Widget")
     app.setQuitOnLastWindowClosed(False)
@@ -95,3 +100,4 @@ def run(cfg: Config) -> int:
     finally:
         background.stop()
         storage.close()
+        single.release()

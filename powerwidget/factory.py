@@ -12,6 +12,9 @@ log = logging.getLogger(__name__)
 
 
 def make_source(name: str, cfg: Config) -> PowerSource:
+    if name == "lhmlib":
+        from .sensors.lhm_lib import LhmLibSource
+        return LhmLibSource()
     if name == "lhm":
         from .sensors.lhm import LhmSource
         return LhmSource(cfg.lhm_url)
@@ -29,11 +32,15 @@ def make_source(name: str, cfg: Config) -> PowerSource:
 
 def build_composite(cfg: Config) -> CompositeSource:
     sources = []
+    skipped: dict[str, str] = {}
     for name in cfg.sources:
         try:
             sources.append(make_source(name, cfg))
         except SourceUnavailable as exc:
             log.info("skipping %s: %s", name, exc)
+            skipped[name] = str(exc)
     if not sources:
         raise SourceUnavailable("none of the configured sources could start")
-    return CompositeSource(sources, other_w=cfg.other_w)
+    composite = CompositeSource(sources, other_w=cfg.other_w)
+    composite.skipped = skipped
+    return composite

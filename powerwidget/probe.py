@@ -25,7 +25,7 @@ def energy_meter_available() -> str:
 
 def probe(cfg: Config) -> list[tuple[str, str]]:
     results = []
-    for name in ("lhm", "nvml", "estimate"):
+    for name in ("lhmlib", "lhm", "nvml", "estimate"):
         try:
             src = make_source(name, cfg)
             r = src.read()

@@ -13,7 +13,7 @@ CPU power needs admin rights and LHM's kernel driver. Recent versions use the
 PawnIO driver instead of the old WinRing0 one that Defender flags. Its
 built-in web server publishes everything as JSON at
 `http://localhost:8085/data.json`, so our logger can run without admin and
-without loading .NET. **Chosen as the primary source.**
+without loading .NET. **Chosen as the primary source.** Update: LibreHardwareMonitorLib (the same code as a .NET library, MPL-2.0) is now loaded in-process through pythonnet, so no second program has to run. It still needs administrator rights and the PawnIO driver (0.9.6 no longer uses WinRing0); the web server route stays as a fallback.
 
 **NVML (`nvidia-ml-py`).** NVIDIA's official library. Board power for every
 NVIDIA GPU, no admin needed, very cheap to call. **Used for the GPU when LHM

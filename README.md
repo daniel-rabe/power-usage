@@ -17,8 +17,8 @@ for the full comparison.
 
 | Part | Source | Accuracy |
 |---|---|---|
-| CPU package | **LibreHardwareMonitor** (primary) | Good. Read from the CPU's own energy counters (Intel RAPL, AMD SMU) |
-| GPU board | LibreHardwareMonitor, or **NVML** for NVIDIA cards | Good. Reported by the GPU driver |
+| CPU package | **LibreHardwareMonitorLib**, built in (primary) | Good. Read from the CPU's own energy counters (Intel RAPL, AMD SMU) |
+| GPU board | the same library, or **NVML** for NVIDIA cards | Good. Reported by the GPU driver |
 | Board, RAM, drives, fans, PSU loss | fixed `other_w` (default 40 W) | Rough. Tune it once with a wall meter |
 | Fallback when no sensor answers | CPU load x TDP estimate | Poor. Every such sample is flagged `estimated` |
 
@@ -50,12 +50,21 @@ split and today's kWh and cost. Drag it anywhere; it remembers its place.
 The widget logs by itself. If a separate `powerwidget log` process already
 runs, the widget only reads, so no sample is ever counted twice.
 
-For real CPU and GPU readings, also install
-[LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/releases),
-run it **as administrator**, and turn on *Options > Remote Web Server > Run*
-(port 8085). Also tick *Options > Run On Windows Startup* and *Start Minimized*.
-Without it the app still works, using NVIDIA's driver for the GPU (if you
-have one) and an estimate for the CPU.
+No other program has to run next to it. The LibreHardwareMonitor library is
+included (`powerwidget/vendor/lhm`, MPL-2.0) and loaded directly. For real CPU
+readings it needs two things, and `start.bat` takes care of both:
+
+- **Administrator rights.** `start.bat` asks once per start. Menu item 5 sets
+  up the autostart as a scheduled task with highest privileges, so there is
+  no prompt at logon.
+- **The PawnIO driver**, installed once (`winget install namazso.PawnIO`,
+  menu item 7). It is a small signed driver that also LibreHardwareMonitor and
+  FanControl use.
+
+Without them the widget still works: NVIDIA GPU power comes from the driver
+(no admin needed) and the CPU is estimated. The widget then says why.
+The old way (a separately running LibreHardwareMonitor with its Remote Web
+Server) still works as a fallback, source name `lhm`.
 
 Manual use, from a terminal in this folder:
 
@@ -74,7 +83,7 @@ Optional `%APPDATA%\PowerWidget\config.toml`. Every key is optional:
 
 ```toml
 sample_interval_s = 5
-sources = ["lhm", "nvml", "estimate"]   # tried in order, per component
+sources = ["lhmlib", "lhm", "nvml", "estimate"]   # tried in order, per component
 lhm_url = "http://localhost:8085/data.json"
 other_w = 40          # board, RAM, drives, fans, PSU loss
 cpu_tdp_w = 105       # only used by the estimate fallback

@@ -31,7 +31,7 @@ def default_db_path() -> str:
 class Config:
     sample_interval_s: float = 5.0
     # Sources tried in this order; each component comes from the first that has it.
-    sources: list[str] = field(default_factory=lambda: ["lhm", "nvml", "estimate"])
+    sources: list[str] = field(default_factory=lambda: ["lhmlib", "lhm", "nvml", "estimate"])
     lhm_url: str = "http://localhost:8085/data.json"
     # Everything the sensors cannot see: board, RAM, drives, fans, PSU loss.
     other_w: float = 40.0

@@ -21,6 +21,7 @@ class CompositeSource:
         self.other_w = other_w
         self._clock = clock
         self._last_error: dict[str, str] = {}
+        self.skipped: dict[str, str] = {}  # sources that could not start, and why
 
     def read(self) -> PowerReading:
         cpu = gpu = None

@@ -27,6 +27,7 @@ class BackgroundLogger:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self.error: str | None = None
+        self.hint: str | None = None  # why real CPU readings are missing, if they are
 
     @property
     def running(self) -> bool:
@@ -44,6 +45,7 @@ class BackgroundLogger:
             self.error = str(exc)
             self._lock.release()
             return False
+        self.hint = source.skipped.get("lhmlib")
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, args=(source,), name="power-logger", daemon=True)
         self._thread.start()

@@ -89,7 +89,8 @@ class PowerWidget(QWidget):
             when = f" (zuletzt {datetime.fromtimestamp(r.timestamp):%d.%m. %H:%M})" if r else ""
             self._set_status(f"⚠ {reason}{when}")
         elif r.estimated:
-            self._set_status("≈ geschätzt – LibreHardwareMonitor starten für echte Werte")
+            hint = getattr(self.background, "hint", None)
+            self._set_status(f"≈ geschätzt – {hint}" if hint else "≈ geschätzt")
         else:
             self._set_status(None)
         self.adjustSize()
