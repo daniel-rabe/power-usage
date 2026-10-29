@@ -54,6 +54,7 @@ def run(cfg: Config) -> int:
     def show_history() -> None:
         if not history:
             history.append(HistoryWindow(cfg, storage))
+            history[0].settings_button.clicked.connect(show_settings)
         w = history[0]
         w.reload()
         w.showNormal()
@@ -63,7 +64,15 @@ def run(cfg: Config) -> int:
     def toggle_widget() -> None:
         widget.setVisible(not widget.isVisible())
 
+    def show_settings() -> None:
+        from .settings import SettingsDialog
+        if SettingsDialog(cfg).exec():
+            widget.refresh_today()
+            if history:
+                history[0].reload()
+
     widget.open_history.connect(show_history)
+    widget.open_settings.connect(show_settings)
     widget.quit_requested.connect(app.quit)
 
     if QSystemTrayIcon.isSystemTrayAvailable():
@@ -72,6 +81,7 @@ def run(cfg: Config) -> int:
         menu = QMenu()
         menu.addAction("Widget ein-/ausblenden", toggle_widget)
         menu.addAction("Verlauf und Diagramme…", show_history)
+        menu.addAction("Einstellungen…", show_settings)
         menu.addSeparator()
         menu.addAction("Beenden", app.quit)
         tray.setContextMenu(menu)

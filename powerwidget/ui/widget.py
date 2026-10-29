@@ -26,6 +26,7 @@ QLabel { color: #e8eaed; }
 
 class PowerWidget(QWidget):
     open_history = Signal()
+    open_settings = Signal()
     quit_requested = Signal()
 
     def __init__(self, cfg: Config, storage: Storage, background):
@@ -137,6 +138,7 @@ class PowerWidget(QWidget):
                       checked=bool(self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint))
         top.toggled.connect(self.set_on_top)
         menu.addAction(top)
+        menu.addAction("Einstellungen…", self.open_settings.emit)
         menu.addAction("Datenordner öffnen", self.open_data_folder)
         menu.addSeparator()
         menu.addAction("Beenden", self.quit_requested.emit)

@@ -120,6 +120,8 @@ class HistoryWindow(QWidget):
         bar.addStretch()
         refresh = QPushButton("Aktualisieren")
         refresh.clicked.connect(self.reload)
+        self.settings_button = QPushButton("Strompreis…")
+        bar.addWidget(self.settings_button)
         export = QPushButton("CSV exportieren…")
         export.clicked.connect(self.export_csv)
         bar.addWidget(refresh)

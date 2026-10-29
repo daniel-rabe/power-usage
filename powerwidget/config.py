@@ -6,6 +6,7 @@ Elsewhere: ~/.config/powerwidget and ~/.local/share/powerwidget.
 
 from __future__ import annotations
 
+import json
 import os
 import tomllib
 from dataclasses import dataclass, field, fields
@@ -58,3 +59,28 @@ class Config:
         if unknown:
             raise ValueError(f"unknown settings in {path}: {', '.join(sorted(unknown))}")
         return cls(**data)
+
+    def save(self, keys: list[str], path: Path | None = None) -> None:
+        """Write `keys` into config.toml, keeping whatever else the file already holds."""
+        path = path or config_path()
+        data = {}
+        if path.exists():
+            with path.open("rb") as fh:
+                data = tomllib.load(fh)
+        for key in keys:
+            data[key] = getattr(self, key)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        lines = [f"{k} = {_toml_value(v)}" for k, v in data.items()]
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _toml_value(v) -> str:
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return repr(v)
+    if isinstance(v, str):
+        return json.dumps(v, ensure_ascii=False)
+    if isinstance(v, list):
+        return "[" + ", ".join(_toml_value(x) for x in v) + "]"
+    raise TypeError(f"cannot write {type(v).__name__} to config.toml")

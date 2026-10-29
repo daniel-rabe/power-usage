@@ -54,3 +54,17 @@ class _MemSettings(dict):
 
     def setValue(self, key, value):
         self[key] = value
+
+
+def test_settings_dialog_saves_price(app, tmp_path, monkeypatch):
+    from powerwidget import config
+    from powerwidget.ui.settings import SettingsDialog
+
+    monkeypatch.setattr(config, "config_path", lambda: tmp_path / "config.toml")
+    cfg = Config(db_path=str(tmp_path / "p.db"))
+    d = SettingsDialog(cfg)
+    d.price.setValue(0.4123)
+    d.currency.setText("CHF")
+    d.accept()
+    assert Config.load(tmp_path / "config.toml").price_per_kwh == 0.4123
+    assert cfg.currency == "CHF"

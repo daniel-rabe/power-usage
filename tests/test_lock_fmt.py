@@ -17,3 +17,16 @@ def test_german_formatting():
     assert fmt.kwh(1530) == "1,53 kWh"
     assert fmt.money(0.456, "€") == "0,46 €"
     assert fmt.duration(5400) == "1,5 h"
+
+
+def test_config_save_keeps_other_settings(tmp_path):
+    from powerwidget.config import Config
+    path = tmp_path / "config.toml"
+    path.write_text('other_w = 55.0\nsources = ["lhm", "estimate"]\n', encoding="utf-8")
+    cfg = Config.load(path)
+    cfg.price_per_kwh, cfg.currency, cfg.db_path = 0.3512, "CHF", "/somewhere/else.db"
+    cfg.save(["price_per_kwh", "currency"], path)
+    again = Config.load(path)
+    assert (again.price_per_kwh, again.currency, again.other_w) == (0.3512, "CHF", 55.0)
+    assert again.sources == ["lhm", "estimate"]
+    assert again.db_path != "/somewhere/else.db"  # only the requested keys are written

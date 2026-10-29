@@ -45,7 +45,7 @@ split and today's kWh and cost. Drag it anywhere; it remembers its place.
   - tab *Verbrauch*: energy bars per 5 minutes, hour or day
   - tab *Messwerte*: the individual 5-second samples
   - *CSV exportieren*: the chart data as a CSV that opens in German Excel
-- **Right-click**: history, always-on-top on/off, open data folder, quit.
+- **Right-click**: history, always-on-top on/off, settings (electricity price and currency), open data folder, quit.
 
 The widget logs by itself. If a separate `powerwidget log` process already
 runs, the widget only reads, so no sample is ever counted twice.
