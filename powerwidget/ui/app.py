@@ -67,7 +67,11 @@ def run(cfg: Config) -> int:
         w.activateWindow()
 
     def toggle_widget() -> None:
-        widget.setVisible(not widget.isVisible())
+        if widget.isVisible():
+            widget.hide()
+        else:
+            widget.show()
+            widget.raise_()
 
     def show_settings() -> None:
         from .settings import SettingsDialog
@@ -82,7 +86,8 @@ def run(cfg: Config) -> int:
 
     if QSystemTrayIcon.isSystemTrayAvailable():
         tray = QSystemTrayIcon(icon, app)
-        tray.setToolTip("Power Widget")
+        tray.setToolTip(widget.tooltip_text())
+        widget.tooltip_changed.connect(tray.setToolTip)
         menu = QMenu()
         menu.addAction("Widget ein-/ausblenden", toggle_widget)
         menu.addAction("Verlauf und Diagramme…", show_history)
@@ -90,8 +95,15 @@ def run(cfg: Config) -> int:
         menu.addSeparator()
         menu.addAction("Beenden", app.quit)
         tray.setContextMenu(menu)
-        tray.activated.connect(
-            lambda reason: show_history() if reason == QSystemTrayIcon.ActivationReason.DoubleClick else None)
+        def on_tray_activated(reason: QSystemTrayIcon.ActivationReason) -> None:
+            if reason == QSystemTrayIcon.ActivationReason.Trigger:  # single left click
+                toggle_widget()
+            elif reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+                # Windows reports the first click of a double-click as Trigger too, so undo that toggle.
+                toggle_widget()
+                show_history()
+
+        tray.activated.connect(on_tray_activated)
         tray.show()
 
     widget.show()

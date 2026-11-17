@@ -30,6 +30,7 @@ class PowerWidget(QWidget):
     open_history = Signal()
     open_settings = Signal()
     quit_requested = Signal()
+    tooltip_changed = Signal(str)  # summary for the tray icon, so the app is usable with the widget hidden
     _setup_done = Signal(bool, str)
 
     def __init__(self, cfg: Config, storage: Storage, background):
@@ -56,6 +57,7 @@ class PowerWidget(QWidget):
         for w in (self.total, self.parts, self.today, self.status):
             lay.addWidget(w)
         self.status.hide()
+        self._tooltip = ""
         self.setToolTip("Doppelklick: Verlauf · Rechtsklick: Menü · Ziehen: verschieben")
 
         self._drag_from: QPoint | None = None
@@ -98,12 +100,28 @@ class PowerWidget(QWidget):
         else:
             self._set_status(None)
         self.adjustSize()
+        self._update_tooltip()
 
     def refresh_today(self) -> None:
         start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
         s = self.storage.summary(start, time.time() + 1)
         cost = s.energy_wh / 1000 * self.cfg.price_per_kwh
         self.today.setText(f"Heute {fmt.kwh(s.energy_wh)}  ·  {fmt.money(cost, self.cfg.currency)}")
+        self._update_tooltip()
+
+    def tooltip_text(self) -> str:
+        """Current watts, split, today's energy and any warning, for the tray icon tooltip."""
+        lines = [f"Power Widget: {self.total.text()}", self.parts.text(), self.today.text()]
+        if self.status.text():
+            lines.append(self.status.text())
+        text = "\n".join(line for line in lines if line)
+        return text if len(text) <= 127 else text[:126] + "…"  # Windows cuts tray tooltips at 127 chars
+
+    def _update_tooltip(self) -> None:
+        text = self.tooltip_text()
+        if text != self._tooltip:
+            self._tooltip = text
+            self.tooltip_changed.emit(text)
 
     def _set_status(self, text: str | None) -> None:
         self.status.setVisible(bool(text))

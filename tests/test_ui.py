@@ -48,6 +48,29 @@ def test_widget_and_history_render(app, tmp_path, monkeypatch):
     st.close()
 
 
+def test_tray_tooltip_follows_new_readings(app, tmp_path, monkeypatch):
+    from powerwidget.ui.widget import PowerWidget
+
+    monkeypatch.setattr("powerwidget.ui.widget.QSettings", lambda *a: _MemSettings())
+    cfg = Config(db_path=str(tmp_path / "p.db"))
+    st = Storage(cfg.db_path)
+    now = time.time()
+    st.insert(PowerReading(now - 5, 150.0, 60.0, 50.0, 40.0, False, {"cpu": "lhm"}), 5)
+    w = PowerWidget(cfg, st, NoLogger())
+    first = w.tooltip_text()
+    assert "150 W" in first and "CPU 60" in first and "Heute" in first
+    assert len(first) <= 127
+    seen = []
+    w.tooltip_changed.connect(seen.append)
+    w.hide()  # the tooltip must keep updating while the overlay is hidden
+    st.insert(PowerReading(now, 210.0, 120.0, 50.0, 40.0, False, {"cpu": "lhm"}), 5)
+    w.refresh()
+    assert seen and "210 W" in seen[-1]
+    w.refresh()  # unchanged text: no new signal
+    assert len(seen) == 1
+    st.close()
+
+
 class _MemSettings(dict):
     def value(self, key, default=None, type=None):
         return self.get(key, default)

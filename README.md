@@ -66,6 +66,8 @@ split and today's kWh and cost. Drag it anywhere; it remembers its place.
   - tab *Messwerte*: the individual 5-second samples
   - *CSV exportieren*: the chart data as a CSV that opens in German Excel
 - **Right-click**: history, always-on-top on/off, settings (electricity price and currency), open data folder, quit.
+- **Tray icon**: a click shows or hides the widget, a double-click opens the history. Its tooltip shows the
+  current watts, the CPU/GPU/rest split and today's kWh and cost, so the widget can stay hidden.
 
 The widget logs by itself. If a separate `powerwidget log` process already
 runs, the widget only reads, so no sample is ever counted twice.
